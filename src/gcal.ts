@@ -231,7 +231,9 @@ export class GoogleCalendarClient {
 				const endMs = new Date(end).getTime();
 				if (endMs <= dayStartMs || startMs >= dayEndMs) continue;
 				out.push({
-					title: item.summary || "(untitled)",
+					// Calendar titles can carry stray whitespace; the note
+					// round-trip trims it, so trim here or nothing matches.
+					title: (item.summary ?? "").trim() || "(untitled)",
 					start: clampMin(startMs),
 					end: clampMin(endMs),
 				});

@@ -514,6 +514,10 @@ export function upsertMeetings(
 	/** The entry's time on the calendar: `booked` once the user adjusted. */
 	const calRange = (m: MeetingEntry): TimeRange => m.booked ?? m.range;
 
+	/** Whitespace-insensitive title equality — defense against sources
+	 * whose titles carry stray spaces the note round-trip would strip. */
+	const sameTitle = (a: string, b: string) => a.trim() === b.trim();
+
 	/**
 	 * Applies the calendar's times: an adjusted entry keeps its user-set
 	 * range and only tracks calendar changes in `booked`; an untouched
@@ -547,7 +551,7 @@ export function upsertMeetings(
 		let found: { kind: "meeting"; meeting: MeetingEntry } | undefined;
 		for (const e of unmatched) {
 			if (
-				e.meeting.title === m.title &&
+				sameTitle(e.meeting.title, m.title) &&
 				calRange(e.meeting).start === m.start
 			) {
 				found = e;
@@ -565,7 +569,7 @@ export function upsertMeetings(
 	for (const m of pending) {
 		let found: { kind: "meeting"; meeting: MeetingEntry } | undefined;
 		for (const e of unmatched) {
-			if (e.meeting.title === m.title) {
+			if (sameTitle(e.meeting.title, m.title)) {
 				found = e;
 				break;
 			}
@@ -577,7 +581,7 @@ export function upsertMeetings(
 			items.push({
 				kind: "meeting",
 				meeting: {
-					title: m.title,
+					title: m.title.trim(),
 					range: { start: m.start, end: m.end },
 					notes: [],
 					cancelled: false,

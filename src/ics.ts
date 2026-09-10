@@ -87,7 +87,7 @@ function expandEvent(
 ) {
 	if (isCancelled(event.component)) return;
 	if (!event.startDate || event.startDate.isDate) return; // all-day
-	const title = event.summary || "(untitled)";
+	const title = (event.summary ?? "").trim() || "(untitled)";
 
 	if (!event.isRecurring()) {
 		push(title, toMs(event.startDate), toMs(event.endDate));
@@ -116,7 +116,7 @@ function expandEvent(
 		if (isCancelled(details.item.component)) continue;
 		if (details.startDate.isDate) continue;
 		push(
-			details.item.summary || title,
+			(details.item.summary ?? "").trim() || title,
 			toMs(details.startDate),
 			toMs(details.endDate)
 		);

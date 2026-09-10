@@ -365,6 +365,7 @@ function upsertMeetings(items, calMeetings, markCancellations = false) {
     }
   };
   const calRange = (m) => m.booked ?? m.range;
+  const sameTitle = (a, b) => a.trim() === b.trim();
   const applyCalTimes = (mm, m) => {
     if (mm.booked) {
       if (mm.booked.start !== m.start || mm.booked.end !== m.end) {
@@ -384,7 +385,7 @@ function upsertMeetings(items, calMeetings, markCancellations = false) {
     if (m.end <= m.start) continue;
     let found;
     for (const e of unmatched) {
-      if (e.meeting.title === m.title && calRange(e.meeting).start === m.start) {
+      if (sameTitle(e.meeting.title, m.title) && calRange(e.meeting).start === m.start) {
         found = e;
         break;
       }
@@ -399,7 +400,7 @@ function upsertMeetings(items, calMeetings, markCancellations = false) {
   for (const m of pending) {
     let found;
     for (const e of unmatched) {
-      if (e.meeting.title === m.title) {
+      if (sameTitle(e.meeting.title, m.title)) {
         found = e;
         break;
       }
@@ -411,7 +412,7 @@ function upsertMeetings(items, calMeetings, markCancellations = false) {
       items.push({
         kind: "meeting",
         meeting: {
-          title: m.title,
+          title: m.title.trim(),
           range: { start: m.start, end: m.end },
           notes: [],
           cancelled: false,
@@ -8399,7 +8400,7 @@ function occurrencesForDay(events, dayStartMs) {
 function expandEvent(event, dayStartMs, dayEndMs, push) {
   if (isCancelled(event.component)) return;
   if (!event.startDate || event.startDate.isDate) return;
-  const title = event.summary || "(untitled)";
+  const title = (event.summary ?? "").trim() || "(untitled)";
   if (!event.isRecurring()) {
     push(title, toMs(event.startDate), toMs(event.endDate));
     return;
@@ -8420,7 +8421,7 @@ function expandEvent(event, dayStartMs, dayEndMs, push) {
     if (isCancelled(details.item.component)) continue;
     if (details.startDate.isDate) continue;
     push(
-      details.item.summary || title,
+      (details.item.summary ?? "").trim() || title,
       toMs(details.startDate),
       toMs(details.endDate)
     );
@@ -8628,7 +8629,9 @@ var GoogleCalendarClient = class {
         const endMs = new Date(end).getTime();
         if (endMs <= dayStartMs || startMs >= dayEndMs) continue;
         out.push({
-          title: item.summary || "(untitled)",
+          // Calendar titles can carry stray whitespace; the note
+          // round-trip trims it, so trim here or nothing matches.
+          title: (item.summary ?? "").trim() || "(untitled)",
           start: clampMin(startMs),
           end: clampMin(endMs)
         });
