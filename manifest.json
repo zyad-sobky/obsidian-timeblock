@@ -1,0 +1,9 @@
+{
+	"id": "timeblocks",
+	"name": "Timeblocks",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.0",
+	"description": "Day-timeline timeblocking stored in your daily notes, with planned vs revised durations for retrospectives.",
+	"author": "Zyad",
+	"isDesktopOnly": false
+}

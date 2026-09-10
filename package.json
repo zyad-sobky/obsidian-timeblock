@@ -1,0 +1,20 @@
+{
+	"name": "timeblocks",
+	"version": "0.1.0",
+	"description": "Timeblocking plugin for Obsidian daily notes",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+	},
+	"devDependencies": {
+		"@types/node": "^20.11.0",
+		"builtin-modules": "^3.3.0",
+		"esbuild": "^0.21.5",
+		"obsidian": "^1.7.2",
+		"typescript": "^5.4.5"
+	},
+	"dependencies": {
+		"ical.js": "^2.2.1"
+	}
+}

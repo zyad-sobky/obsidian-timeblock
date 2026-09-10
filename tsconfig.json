@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"baseUrl": ".",
+		"target": "ES2021",
+		"module": "ESNext",
+		"moduleResolution": "node",
+		"lib": ["DOM", "ES2021"],
+		"strict": true,
+		"noImplicitAny": true,
+		"allowSyntheticDefaultImports": true,
+		"importHelpers": false,
+		"isolatedModules": true,
+		"skipLibCheck": true,
+		"noEmit": true
+	},
+	"include": ["src/**/*.ts"]
+}
