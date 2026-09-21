@@ -46,8 +46,9 @@ var BLOCK_HEADING_RE = /^#####\s*⏱️?\s*\*(\d{1,2}:\d{2})-(\d{1,2}:\d{2})\*\s
 var LEGACY_BLOCK_RE = /^- (\d{1,2}:\d{2})-(\d{1,2}:\d{2})\s+(.+?)(?:\s+\(planned (\d{1,2}:\d{2})-(\d{1,2}:\d{2})\))?\s*$/;
 var MEETING_HEADING_RE = /^#####\s*📅\s*\*(\d{1,2}:\d{2})-(\d{1,2}:\d{2})\*\s*·\s*(.+?)(?:\s+\((skipped)\))?(?:\s+\(booked (\d{1,2}:\d{2})-(\d{1,2}:\d{2})\))?\s*$/;
 var FENCE_RE = /^\s{0,3}(`{3,}|~{3,})/;
-var REMINDER_RE = /^\s*- \[ \]\s+(.+?)\s*$/;
-var REMINDER_ANY_RE = /^\s*- \[( |x|X|-|>)\]\s+(.+?)\s*$/;
+var REMINDER_RE = /^- \[ \]\s+(.+?)\s*$/;
+var REMINDER_ANY_RE = /^- \[( |x|X|-|>)\]\s+(.+?)\s*$/;
+var INDENTED_CONTENT_RE = /^[ \t]+\S/;
 var MOVED_SUFFIX_RE = /\s*\(moved to .*?\)$/;
 function parseTime(s) {
   const [h, m] = s.split(":").map((n) => parseInt(n, 10));
@@ -291,6 +292,8 @@ function addReminderToTasks(content, text) {
     const m = REMINDER_ANY_RE.exec(lines[i]);
     if (m) {
       if (m[2] === text) return content;
+      insertAt = i + 1;
+    } else if (insertAt === i && INDENTED_CONTENT_RE.test(lines[i])) {
       insertAt = i + 1;
     }
   }

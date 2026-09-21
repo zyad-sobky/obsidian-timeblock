@@ -68,8 +68,11 @@ const LEGACY_BLOCK_RE =
 const MEETING_HEADING_RE =
 	/^#####\s*📅\s*\*(\d{1,2}:\d{2})-(\d{1,2}:\d{2})\*\s*·\s*(.+?)(?:\s+\((skipped)\))?(?:\s+\(booked (\d{1,2}:\d{2})-(\d{1,2}:\d{2})\))?\s*$/;
 const FENCE_RE = /^\s{0,3}(`{3,}|~{3,})/;
-const REMINDER_RE = /^\s*- \[ \]\s+(.+?)\s*$/;
-const REMINDER_ANY_RE = /^\s*- \[( |x|X|-|>)\]\s+(.+?)\s*$/;
+// Anchored to column 0: indented checkboxes are subtasks of the task above
+// and must not surface as tasks of their own.
+const REMINDER_RE = /^- \[ \]\s+(.+?)\s*$/;
+const REMINDER_ANY_RE = /^- \[( |x|X|-|>)\]\s+(.+?)\s*$/;
+const INDENTED_CONTENT_RE = /^[ \t]+\S/;
 const MOVED_SUFFIX_RE = /\s*\(moved to .*?\)$/;
 
 export function parseTime(s: string): number | null {
@@ -409,6 +412,10 @@ export function addReminderToTasks(content: string, text: string): string | null
 		const m = REMINDER_ANY_RE.exec(lines[i]);
 		if (m) {
 			if (m[2] === text) return content;
+			insertAt = i + 1;
+		} else if (insertAt === i && INDENTED_CONTENT_RE.test(lines[i])) {
+			// Indented subtasks/notes ride with the task above them — insert
+			// after the whole group, not between a task and its children.
 			insertAt = i + 1;
 		}
 	}
