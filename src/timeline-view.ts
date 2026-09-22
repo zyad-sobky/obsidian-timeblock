@@ -14,7 +14,9 @@ import {
 
 export const VIEW_TYPE_TIMELINE = "timeblocks-timeline";
 
-const PX_PER_MIN = 1;
+const MIN_HOUR_PX = 40;
+const MAX_HOUR_PX = 300;
+const ZOOM_STEP_PX = 20;
 
 type DragState =
 	| { mode: "create"; anchor: number; el: HTMLElement }
@@ -128,6 +130,33 @@ export class TimelineView extends ItemView {
 		return Math.max(1, this.plugin.settings.snapMinutes);
 	}
 
+	/** Vertical zoom: pixels per minute, from the hour-height setting. */
+	private get pxPerMin(): number {
+		const h = this.plugin.settings.hourHeightPx || 120;
+		return Math.min(MAX_HOUR_PX, Math.max(MIN_HOUR_PX, h)) / 60;
+	}
+
+	/** Time to keep centered across the next render (set when zooming). */
+	private zoomAnchorMin: number | null = null;
+
+	private zoomBy(deltaPx: number) {
+		const s = this.plugin.settings;
+		const current = Math.min(
+			MAX_HOUR_PX,
+			Math.max(MIN_HOUR_PX, s.hourHeightPx || 120)
+		);
+		const next = Math.min(MAX_HOUR_PX, Math.max(MIN_HOUR_PX, current + deltaPx));
+		if (next === current) return;
+		if (this.scrollEl) {
+			this.zoomAnchorMin =
+				(this.scrollEl.scrollTop + this.scrollEl.clientHeight / 2) /
+					this.pxPerMin +
+				this.renderStart;
+		}
+		s.hourHeightPx = next;
+		void this.plugin.saveSettings(); // triggers a re-render
+	}
+
 	// ---------------------------------------------------------------- render
 
 	private render() {
@@ -167,6 +196,15 @@ export class TimelineView extends ItemView {
 		setIcon(breakBtn, "coffee");
 		breakBtn.setAttr("aria-label", "Start a break now");
 		breakBtn.addEventListener("click", () => this.plugin.startBreakNow());
+
+		const zoomOut = header.createEl("button", { cls: "tb-nav tb-action" });
+		setIcon(zoomOut, "zoom-out");
+		zoomOut.setAttr("aria-label", "Show more hours (shorter items)");
+		zoomOut.addEventListener("click", () => this.zoomBy(-ZOOM_STEP_PX));
+		const zoomIn = header.createEl("button", { cls: "tb-nav tb-action" });
+		setIcon(zoomIn, "zoom-in");
+		zoomIn.setAttr("aria-label", "Show fewer hours (taller items)");
+		zoomIn.addEventListener("click", () => this.zoomBy(ZOOM_STEP_PX));
 
 		// Plan/Track: what a block drag means. Plan = still estimating
 		// (planned + revised move together, no ghost); Track = recording
@@ -247,10 +285,10 @@ export class TimelineView extends ItemView {
 		this.scrollEl = root.createDiv("tb-scroll");
 		const grid = this.scrollEl.createDiv("tb-grid");
 		this.gridEl = grid;
-		grid.style.height = `${(endMin - startMin) * PX_PER_MIN}px`;
+		grid.style.height = `${(endMin - startMin) * this.pxPerMin}px`;
 
 		for (let m = startMin; m <= endMin; m += 60) {
-			const y = (m - startMin) * PX_PER_MIN;
+			const y = (m - startMin) * this.pxPerMin;
 			const line = grid.createDiv("tb-hourline");
 			line.style.top = `${y}px`;
 			if (m < endMin) {
@@ -399,13 +437,21 @@ export class TimelineView extends ItemView {
 			this.syncEl = null;
 		}
 
-		if (savedScroll !== null) {
+		if (this.zoomAnchorMin !== null) {
+			// Keep the same time centered across a zoom change.
+			this.scrollEl.scrollTop = Math.max(
+				0,
+				(this.zoomAnchorMin - this.renderStart) * this.pxPerMin -
+					this.scrollEl.clientHeight / 2
+			);
+			this.zoomAnchorMin = null;
+		} else if (savedScroll !== null) {
 			this.scrollEl.scrollTop = savedScroll;
 		} else {
 			this.resetScroll = false;
 			const nowMin = currentMinutes();
 			const target = this.store.date.isSame(moment(), "day")
-				? (nowMin - this.renderStart) * PX_PER_MIN - 120
+				? (nowMin - this.renderStart) * this.pxPerMin - 120
 				: 0;
 			this.scrollEl.scrollTop = Math.max(0, target);
 		}
@@ -422,8 +468,8 @@ export class TimelineView extends ItemView {
 	}
 
 	private positionEl(el: HTMLElement, start: number, end: number) {
-		el.style.top = `${(start - this.renderStart) * PX_PER_MIN}px`;
-		el.style.height = `${(end - start) * PX_PER_MIN}px`;
+		el.style.top = `${(start - this.renderStart) * this.pxPerMin}px`;
+		el.style.height = `${(end - start) * this.pxPerMin}px`;
 	}
 
 	private updateSyncStatus() {
@@ -447,7 +493,7 @@ export class TimelineView extends ItemView {
 			return;
 		}
 		this.nowLineEl.show();
-		this.nowLineEl.style.top = `${(min - this.renderStart) * PX_PER_MIN}px`;
+		this.nowLineEl.style.top = `${(min - this.renderStart) * this.pxPerMin}px`;
 	}
 
 	// --------------------------------------------------------------- popover
@@ -591,7 +637,7 @@ export class TimelineView extends ItemView {
 
 	private yToMin(e: PointerEvent): number {
 		const rect = this.gridEl.getBoundingClientRect();
-		const raw = (e.clientY - rect.top) / PX_PER_MIN + this.renderStart;
+		const raw = (e.clientY - rect.top) / this.pxPerMin + this.renderStart;
 		const snapped = Math.round(raw / this.snap()) * this.snap();
 		return Math.min(Math.max(snapped, this.renderStart), this.renderEnd);
 	}

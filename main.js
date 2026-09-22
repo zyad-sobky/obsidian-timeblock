@@ -8761,7 +8761,9 @@ function dayKey(dayStartMs) {
 // src/timeline-view.ts
 var import_obsidian4 = require("obsidian");
 var VIEW_TYPE_TIMELINE = "timeblocks-timeline";
-var PX_PER_MIN = 1;
+var MIN_HOUR_PX = 40;
+var MAX_HOUR_PX = 300;
+var ZOOM_STEP_PX = 20;
 var TimelineView = class extends import_obsidian4.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -8775,6 +8777,8 @@ var TimelineView = class extends import_obsidian4.ItemView {
     this.pendingRender = false;
     this.resetScroll = true;
     this.suppressMeetingClick = false;
+    /** Time to keep centered across the next render (set when zooming). */
+    this.zoomAnchorMin = null;
     this.plugin = plugin;
     this.store = plugin.store;
   }
@@ -8839,6 +8843,25 @@ var TimelineView = class extends import_obsidian4.ItemView {
   snap() {
     return Math.max(1, this.plugin.settings.snapMinutes);
   }
+  /** Vertical zoom: pixels per minute, from the hour-height setting. */
+  get pxPerMin() {
+    const h = this.plugin.settings.hourHeightPx || 120;
+    return Math.min(MAX_HOUR_PX, Math.max(MIN_HOUR_PX, h)) / 60;
+  }
+  zoomBy(deltaPx) {
+    const s = this.plugin.settings;
+    const current = Math.min(
+      MAX_HOUR_PX,
+      Math.max(MIN_HOUR_PX, s.hourHeightPx || 120)
+    );
+    const next = Math.min(MAX_HOUR_PX, Math.max(MIN_HOUR_PX, current + deltaPx));
+    if (next === current) return;
+    if (this.scrollEl) {
+      this.zoomAnchorMin = (this.scrollEl.scrollTop + this.scrollEl.clientHeight / 2) / this.pxPerMin + this.renderStart;
+    }
+    s.hourHeightPx = next;
+    void this.plugin.saveSettings();
+  }
   // ---------------------------------------------------------------- render
   render() {
     this.pendingRender = false;
@@ -8874,6 +8897,14 @@ var TimelineView = class extends import_obsidian4.ItemView {
     (0, import_obsidian4.setIcon)(breakBtn, "coffee");
     breakBtn.setAttr("aria-label", "Start a break now");
     breakBtn.addEventListener("click", () => this.plugin.startBreakNow());
+    const zoomOut = header.createEl("button", { cls: "tb-nav tb-action" });
+    (0, import_obsidian4.setIcon)(zoomOut, "zoom-out");
+    zoomOut.setAttr("aria-label", "Show more hours (shorter items)");
+    zoomOut.addEventListener("click", () => this.zoomBy(-ZOOM_STEP_PX));
+    const zoomIn = header.createEl("button", { cls: "tb-nav tb-action" });
+    (0, import_obsidian4.setIcon)(zoomIn, "zoom-in");
+    zoomIn.setAttr("aria-label", "Show fewer hours (taller items)");
+    zoomIn.addEventListener("click", () => this.zoomBy(ZOOM_STEP_PX));
     const modeBar = root.createDiv("tb-modebar");
     modeBar.createSpan({ cls: "tb-modebar-label", text: "Drag edits:" });
     const modes = [
@@ -8934,9 +8965,9 @@ var TimelineView = class extends import_obsidian4.ItemView {
     this.scrollEl = root.createDiv("tb-scroll");
     const grid = this.scrollEl.createDiv("tb-grid");
     this.gridEl = grid;
-    grid.style.height = `${(endMin - startMin) * PX_PER_MIN}px`;
+    grid.style.height = `${(endMin - startMin) * this.pxPerMin}px`;
     for (let m = startMin; m <= endMin; m += 60) {
-      const y = (m - startMin) * PX_PER_MIN;
+      const y = (m - startMin) * this.pxPerMin;
       const line = grid.createDiv("tb-hourline");
       line.style.top = `${y}px`;
       if (m < endMin) {
@@ -9065,12 +9096,18 @@ var TimelineView = class extends import_obsidian4.ItemView {
     } else {
       this.syncEl = null;
     }
-    if (savedScroll !== null) {
+    if (this.zoomAnchorMin !== null) {
+      this.scrollEl.scrollTop = Math.max(
+        0,
+        (this.zoomAnchorMin - this.renderStart) * this.pxPerMin - this.scrollEl.clientHeight / 2
+      );
+      this.zoomAnchorMin = null;
+    } else if (savedScroll !== null) {
       this.scrollEl.scrollTop = savedScroll;
     } else {
       this.resetScroll = false;
       const nowMin = currentMinutes();
-      const target = this.store.date.isSame((0, import_obsidian4.moment)(), "day") ? (nowMin - this.renderStart) * PX_PER_MIN - 120 : 0;
+      const target = this.store.date.isSame((0, import_obsidian4.moment)(), "day") ? (nowMin - this.renderStart) * this.pxPerMin - 120 : 0;
       this.scrollEl.scrollTop = Math.max(0, target);
     }
   }
@@ -9082,8 +9119,8 @@ var TimelineView = class extends import_obsidian4.ItemView {
     });
   }
   positionEl(el, start, end) {
-    el.style.top = `${(start - this.renderStart) * PX_PER_MIN}px`;
-    el.style.height = `${(end - start) * PX_PER_MIN}px`;
+    el.style.top = `${(start - this.renderStart) * this.pxPerMin}px`;
+    el.style.height = `${(end - start) * this.pxPerMin}px`;
   }
   updateSyncStatus() {
     if (!this.syncEl || !this.syncEl.isConnected) return;
@@ -9104,7 +9141,7 @@ var TimelineView = class extends import_obsidian4.ItemView {
       return;
     }
     this.nowLineEl.show();
-    this.nowLineEl.style.top = `${(min - this.renderStart) * PX_PER_MIN}px`;
+    this.nowLineEl.style.top = `${(min - this.renderStart) * this.pxPerMin}px`;
   }
   // --------------------------------------------------------------- popover
   closePopover() {
@@ -9212,7 +9249,7 @@ var TimelineView = class extends import_obsidian4.ItemView {
   // ------------------------------------------------------------------ drag
   yToMin(e) {
     const rect = this.gridEl.getBoundingClientRect();
-    const raw = (e.clientY - rect.top) / PX_PER_MIN + this.renderStart;
+    const raw = (e.clientY - rect.top) / this.pxPerMin + this.renderStart;
     const snapped = Math.round(raw / this.snap()) * this.snap();
     return Math.min(Math.max(snapped, this.renderStart), this.renderEnd);
   }
@@ -9662,6 +9699,7 @@ var DEFAULT_SETTINGS = {
   dayStartHour: 8,
   dayEndHour: 20,
   snapMinutes: 15,
+  hourHeightPx: 120,
   icsUrls: "",
   calendarRefreshMinutes: 10,
   googleClientId: "",
@@ -9861,6 +9899,14 @@ var TimeblocksSettingTab = class extends import_obsidian6.PluginSettingTab {
       (v) => this.plugin.settings.snapMinutes = v,
       1,
       60
+    );
+    numberSetting(
+      "Hour height (pixels)",
+      "Vertical zoom: taller hours show fewer of them at once but give short blocks and meetings room for their text. Also adjustable with the zoom buttons on the timeline.",
+      () => this.plugin.settings.hourHeightPx,
+      (v) => this.plugin.settings.hourHeightPx = v,
+      40,
+      300
     );
     new import_obsidian6.Setting(containerEl).setName("Quick actions & retro").setHeading();
     numberSetting(

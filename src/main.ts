@@ -21,6 +21,8 @@ export interface TimeblocksSettings {
 	dayStartHour: number;
 	dayEndHour: number;
 	snapMinutes: number;
+	/** vertical zoom: pixel height of one hour on the timeline */
+	hourHeightPx: number;
 	/** iCal feed URLs (e.g. Google "secret address"), one per line */
 	icsUrls: string;
 	calendarRefreshMinutes: number;
@@ -50,6 +52,7 @@ const DEFAULT_SETTINGS: TimeblocksSettings = {
 	dayStartHour: 8,
 	dayEndHour: 20,
 	snapMinutes: 15,
+	hourHeightPx: 120,
 	icsUrls: "",
 	calendarRefreshMinutes: 10,
 	googleClientId: "",
@@ -301,6 +304,14 @@ class TimeblocksSettingTab extends PluginSettingTab {
 			(v) => (this.plugin.settings.snapMinutes = v),
 			1,
 			60
+		);
+		numberSetting(
+			"Hour height (pixels)",
+			"Vertical zoom: taller hours show fewer of them at once but give short blocks and meetings room for their text. Also adjustable with the zoom buttons on the timeline.",
+			() => this.plugin.settings.hourHeightPx,
+			(v) => (this.plugin.settings.hourHeightPx = v),
+			40,
+			300
 		);
 
 		new Setting(containerEl).setName("Quick actions & retro").setHeading();
