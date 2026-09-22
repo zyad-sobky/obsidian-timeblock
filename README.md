@@ -103,7 +103,8 @@ overwritten; content below it survives. Manual command: "Update day retro".
 ## Settings
 
 Day start/end hour (timeline auto-expands past them if blocks exist outside),
-snap minutes, iCal feed URLs, and calendar refresh interval.
+snap minutes, hour height (vertical zoom — also adjustable via the timeline's
+zoom buttons), iCal feed URLs, and calendar refresh interval.
 
 ## Development
 
